@@ -13,7 +13,7 @@ class FirestoreService {
       // dedicated collection for system control and logging interval
       // Fure.wait: parallel execution
       // merge: true ensures we don't overwrite unrelated fields
-      await Future.wait([
+      await Future.wait<void>([
         // 1. Actuators
         _db.collection('system_controls').doc(docId).set({
           'target_light_intensity': settings.lightIntensity,
@@ -49,6 +49,45 @@ class FirestoreService {
       print("Firestore Error: $e");
       // Shows error message to user in UI
       rethrow;
+    }
+  }
+
+  Future<ControlSettings?> fetchSystemSettings(String systemId) async {
+    final String docId = systemId.toLowerCase().replaceAll(' ', '_');
+    try {
+      // 1. Fetch all three documents at once
+      final snapshots = await Future.wait([
+        _db.collection('system_controls').doc(docId).get(),
+        _db.collection('log_interval').doc(docId).get(),
+        _db.collection('data_thresholds').doc(docId).get(),
+      ]);
+
+      // 2. Extract data (return null if documents don't exist yet)
+      final controls = snapshots[0].data();
+      final logs = snapshots[1].data();
+      final thresholds = snapshots[2].data();
+
+      if (controls == null || logs == null || thresholds == null) return null;
+
+      // 3. Map Firestore types (usually num/int) to Dart doubles
+      return ControlSettings(
+        lightIntensity: (controls['target_light_intensity'] as num).toDouble(),
+        lightDuration: (controls['target_light_duration'] as num).toDouble(),
+        targetWaterLevel: (controls['target_water_level'] as num).toDouble(),
+        stirringSpeed: (controls['target_stirring_speed'] as num).toDouble(),
+        primaryLogInterval: (logs['primary_log_interval'] as num).toDouble(),
+        samplingLogInterval: (logs['sampling_log_interval'] as num).toDouble(),
+        tempMin: (thresholds['temp_min'] as num).toDouble(),
+        tempMax: (thresholds['temp_max'] as num).toDouble(),
+        phMin: (thresholds['ph_min'] as num).toDouble(),
+        phMax: (thresholds['ph_max'] as num).toDouble(),
+        ecMin: (thresholds['ec_min'] as num).toDouble(),
+        ecMax: (thresholds['ec_max'] as num).toDouble(),
+        fcmToken: thresholds['fcmToken'] ?? "initial_token_placeholder",
+      );
+    } catch (e) {
+      print("Fetch error: $e");
+      return null;
     }
   }
 }

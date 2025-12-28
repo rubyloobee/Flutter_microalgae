@@ -13,6 +13,9 @@ class ControlScreen extends StatefulWidget {
 }
 
 class _ControlScreenState extends State<ControlScreen> {
+  // Flag to check progress of data loading from cloud
+  bool _isLoading = true;
+
   // Instantiate the Singleton Manager
   final ControlSettingsManager _manager = ControlSettingsManager();
 
@@ -84,8 +87,11 @@ class _ControlScreenState extends State<ControlScreen> {
     _ecMinController = TextEditingController();
     _ecMaxController = TextEditingController();
 
-    // Load initial data upon creation
+    // Load hardcoded default values
     _initializeStateFromManager();
+
+    // Call cloud fetcher to get real values
+    _loadCloudData();
   }
 
   // Ensures the state updates if the parent widget rebuilds with a different systemId
@@ -112,6 +118,26 @@ class _ControlScreenState extends State<ControlScreen> {
     _ecMinController.dispose();
     _ecMaxController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCloudData() async {
+    // Set flag to true to show CircularProgressIndicator
+    setState(() => _isLoading = true);
+
+    final cloudSettings =
+        await _firestoreService.fetchSystemSettings(widget.systemId);
+
+    if (cloudSettings != null) {
+      // Save to manager so other screens are in sync
+      _manager.updateSettings(widget.systemId, cloudSettings);
+    }
+
+    // Refresh local UI controllers
+    setState(() {
+      _initializeStateFromManager();
+      // Data from Firestore is loaded
+      _isLoading = false;
+    });
   }
 
   // --- Conversion Logic ---
@@ -574,145 +600,149 @@ class _ControlScreenState extends State<ControlScreen> {
   Widget build(BuildContext context) {
     return Container(
       color: Colors.teal.shade50,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Screen Header (Matching Dashboard Style)
-              Text(
-                widget.systemId,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal.shade700,
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Screen Header (Matching Dashboard Style)
+                    Text(
+                      widget.systemId,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.teal.shade700,
+                      ),
+                    ),
+                    const Divider(height: 20, thickness: 1),
+                    const SizedBox(height: 8),
+
+                    _buildControlCard(
+                      title: 'Data Logging Frequency',
+                      icon: Icons.access_time_outlined,
+                      content: _buildLoggingContent(),
+                    ),
+
+                    _buildControlCard(
+                      title: 'Lighting',
+                      icon: Icons.lightbulb_outlined, // Lightbulb icon
+                      content: _buildLightingContent(),
+                    ),
+
+                    // --- 1. Water Level Control ---
+                    _buildControlCard(
+                      title: 'Target Water Level',
+                      icon: Icons.water_drop_outlined,
+                      content: _buildSliderControl(
+                        label: 'Set desired water level:',
+                        value: _targetWaterLevel,
+                        min: 50,
+                        max: 80,
+                        divisions:
+                            3, // Increased divisions for smoother control
+                        unit: '%',
+                        onChanged: (newValue) {
+                          setState(() {
+                            _targetWaterLevel = newValue;
+                          });
+                        },
+                      ),
+                    ),
+
+                    // --- 2. Motor Stirring Speed Control ---
+                    _buildControlCard(
+                      title: 'Motor Stirring Speed',
+                      icon: Icons.rotate_right_outlined,
+                      content: _buildSliderControl(
+                        label: 'Set motor stirring speed:',
+                        value: _stirringSpeed,
+                        min: 50,
+                        max: 200, // Max RPM is conceptual
+                        divisions:
+                            3, // Increased divisions for smoother control
+                        unit: ' RPM',
+                        onChanged: (newValue) {
+                          setState(() {
+                            _stirringSpeed = newValue;
+                          });
+                        },
+                      ),
+                    ),
+
+                    // --- 3. Temperature Alert Thresholds ---
+                    _buildControlCard(
+                      title: 'Temperature Alert Settings',
+                      icon: Icons.thermostat_outlined,
+                      content: _buildThresholdControl(
+                        label: 'Temperature',
+                        minController: _tempMinController,
+                        maxController: _tempMaxController,
+                        unit: '°C',
+                        // Set temperature limits
+                        globalMin: 10.0,
+                        globalMax: 40.0,
+                      ),
+                    ),
+
+                    // --- 4. pH Alert Thresholds ---
+                    _buildControlCard(
+                      title: 'pH Alert Settings',
+                      icon: Icons.science_outlined,
+                      content: _buildThresholdControl(
+                        label: 'pH Level',
+                        minController: _phMinController,
+                        maxController: _phMaxController,
+                        unit: 'pH',
+                        // Set pH limits
+                        globalMin: 5.0,
+                        globalMax: 9.0,
+                      ),
+                    ),
+
+                    // --- 5. EC Alert Thresholds ---
+                    _buildControlCard(
+                      title: 'Conductivity Alert Settings',
+                      icon: Icons.scatter_plot_outlined,
+                      content: _buildThresholdControl(
+                        label: 'Conductivity',
+                        minController: _ecMinController,
+                        maxController: _ecMaxController,
+                        unit: 'ms/cm',
+                        // Set EC limits
+                        globalMin: 0.2,
+                        globalMax: 3.0,
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // --- Save Button ---
+                    Center(
+                      child: ElevatedButton.icon(
+                        onPressed: _saveSettings,
+                        icon: const Icon(Icons.save),
+                        label: const Text('Save Settings to System',
+                            style: TextStyle(fontSize: 16)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal.shade700,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 30, vertical: 15),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          elevation: 8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                  ],
                 ),
               ),
-              const Divider(height: 20, thickness: 1),
-              const SizedBox(height: 8),
-
-              _buildControlCard(
-                title: 'Data Logging Frequency',
-                icon: Icons.access_time_outlined,
-                content: _buildLoggingContent(),
-              ),
-
-              _buildControlCard(
-                title: 'Lighting',
-                icon: Icons.lightbulb_outlined, // Lightbulb icon
-                content: _buildLightingContent(),
-              ),
-
-              // --- 1. Water Level Control ---
-              _buildControlCard(
-                title: 'Target Water Level',
-                icon: Icons.water_drop_outlined,
-                content: _buildSliderControl(
-                  label: 'Set desired water level:',
-                  value: _targetWaterLevel,
-                  min: 50,
-                  max: 80,
-                  divisions: 3, // Increased divisions for smoother control
-                  unit: '%',
-                  onChanged: (newValue) {
-                    setState(() {
-                      _targetWaterLevel = newValue;
-                    });
-                  },
-                ),
-              ),
-
-              // --- 2. Motor Stirring Speed Control ---
-              _buildControlCard(
-                title: 'Motor Stirring Speed',
-                icon: Icons.rotate_right_outlined,
-                content: _buildSliderControl(
-                  label: 'Set motor stirring speed:',
-                  value: _stirringSpeed,
-                  min: 50,
-                  max: 200, // Max RPM is conceptual
-                  divisions: 3, // Increased divisions for smoother control
-                  unit: ' RPM',
-                  onChanged: (newValue) {
-                    setState(() {
-                      _stirringSpeed = newValue;
-                    });
-                  },
-                ),
-              ),
-
-              // --- 3. Temperature Alert Thresholds ---
-              _buildControlCard(
-                title: 'Temperature Alert Settings',
-                icon: Icons.thermostat_outlined,
-                content: _buildThresholdControl(
-                  label: 'Temperature',
-                  minController: _tempMinController,
-                  maxController: _tempMaxController,
-                  unit: '°C',
-                  // Set temperature limits
-                  globalMin: 10.0,
-                  globalMax: 40.0,
-                ),
-              ),
-
-              // --- 4. pH Alert Thresholds ---
-              _buildControlCard(
-                title: 'pH Alert Settings',
-                icon: Icons.science_outlined,
-                content: _buildThresholdControl(
-                  label: 'pH Level',
-                  minController: _phMinController,
-                  maxController: _phMaxController,
-                  unit: 'pH',
-                  // Set pH limits
-                  globalMin: 5.0,
-                  globalMax: 9.0,
-                ),
-              ),
-
-              // --- 5. EC Alert Thresholds ---
-              _buildControlCard(
-                title: 'Conductivity Alert Settings',
-                icon: Icons.scatter_plot_outlined,
-                content: _buildThresholdControl(
-                  label: 'Conductivity',
-                  minController: _ecMinController,
-                  maxController: _ecMaxController,
-                  unit: 'ms/cm',
-                  // Set EC limits
-                  globalMin: 0.2,
-                  globalMax: 3.0,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // --- Save Button ---
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: _saveSettings,
-                  icon: const Icon(Icons.save),
-                  label: const Text('Save Settings to System',
-                      style: TextStyle(fontSize: 16)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal.shade700,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 30, vertical: 15),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    elevation: 8,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }

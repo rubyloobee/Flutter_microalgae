@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // This is the "bridge" that allows your app to read google-services.json
+        // Essential for reading google-services.json
         classpath("com.google.gms:google-services:4.4.0")
     }
 }

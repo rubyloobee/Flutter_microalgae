@@ -1,14 +1,21 @@
 // essential line for building a standard Flutter application
 import 'package:flutter/material.dart';
 import 'loading_screen.dart';
+import 'notification_service.dart';
 
 void main() async {
   // 1. Ensure Flutter is ready to call native code (needed for Firebase)
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. runApp: Sets the widget tree's root.
+  // 2. Initialize Notification Service
+  final notificationService = NotificationService();
+  await notificationService.initForegroundNotifications();
+
+  // 3. runApp: Sets the widget tree's root.
   runApp(const SimpleGreetingApp());
 }
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // 2. The main app container (StatelessWidget)
 class SimpleGreetingApp extends StatelessWidget {
@@ -22,6 +29,7 @@ class SimpleGreetingApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // 3. MaterialApp: Provides Material Design styling and navigation services.
     return MaterialApp(
+      navigatorKey: navigatorKey,
       // returns a widget (blueprint of what should be drawn on the screen)
       // wrapper for whole application
       title:
