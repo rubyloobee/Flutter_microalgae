@@ -56,20 +56,21 @@ class FirestoreService {
     final String docId = systemId.toLowerCase().replaceAll(' ', '_');
     try {
       // 1. Fetch all three documents at once
-      final snapshots = await Future.wait([
+      final snapshots = await Future.wait<DocumentSnapshot>([
         _db.collection('system_controls').doc(docId).get(),
         _db.collection('log_interval').doc(docId).get(),
         _db.collection('data_thresholds').doc(docId).get(),
       ]);
 
       // 2. Extract data (return null if documents don't exist yet)
-      final controls = snapshots[0].data();
-      final logs = snapshots[1].data();
-      final thresholds = snapshots[2].data();
+      final controls = snapshots[0].data() as Map<String, dynamic>?;
+      final logs = snapshots[1].data() as Map<String, dynamic>?;
+      final thresholds = snapshots[2].data() as Map<String, dynamic>?;
 
       if (controls == null || logs == null || thresholds == null) return null;
 
       // 3. Map Firestore types (usually num/int) to Dart doubles
+
       return ControlSettings(
         lightIntensity: (controls['target_light_intensity'] as num).toDouble(),
         lightDuration: (controls['target_light_duration'] as num).toDouble(),

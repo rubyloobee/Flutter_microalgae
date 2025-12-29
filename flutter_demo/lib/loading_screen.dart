@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'main_navigation.dart';
+import 'notification_service.dart';
 
 // LoadingScreen (StatefulWidget)
 // └── Scaffold (Basic Screen Structure)
@@ -55,10 +56,14 @@ class _LoadingScreenState extends State<LoadingScreen> {
       );
       print("Firebase Connected");
 
-      // 2. Add a tiny delay (1s) so the user can actually see the brand icon
+      // 2. Initialize Notification Service (Foreground listening only)
+      final notificationService = NotificationService();
+      await notificationService.initForegroundNotifications();
+
+      // 3. Add a tiny delay (1s) so the user can actually see the brand icon
       await Future.delayed(const Duration(seconds: 1));
 
-      // 3. Move to the main app
+      // 4. Move to the main app
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const MainNavigationScreen()),

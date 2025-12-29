@@ -12,7 +12,7 @@ dependencies:
   firebase_core: ^3.10.1  # Required for initialization
   cloud_firestore: ^5.6.1 # Required for your FirestoreService
   firebase_messaging: ^15.2.1
-  flutter_local_notifications: ^18.0.1
+  flutter_local_notifications: ^19.2.1
 
   # New dependency added to support multi-listener streams for the dashboard fix
   rxdart: ^0.27.7 
