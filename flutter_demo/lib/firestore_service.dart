@@ -11,7 +11,7 @@ class FirestoreService {
     final String docId = systemId.toLowerCase().replaceAll(' ', '_');
     try {
       // dedicated collection for system control and logging interval
-      // Fure.wait: parallel execution
+      // Future.wait: parallel execution
       // merge: true ensures we don't overwrite unrelated fields
       await Future.wait<void>([
         // 1. Actuators
@@ -90,5 +90,22 @@ class FirestoreService {
       print("Fetch error: $e");
       return null;
     }
+  }
+
+  // understand code below
+  // Fetch the most recent activity logs for a specific system
+  Stream<QuerySnapshot> getSystemActivity(String systemId) {
+    // Normalize "System 1" to "system_1"
+    final String docId = systemId.toLowerCase().replaceAll(' ', '_');
+
+    // Matches your structure: system_activity -> system_1 -> log
+    return _db
+        .collection('system_activity')
+        .doc(docId)
+        .collection('log')
+        // Using documentId for ordering since your IDs are timestamp strings
+        .orderBy(FieldPath.documentId, descending: true)
+        .limit(10) // Limit to 10 for dashboard performance
+        .snapshots();
   }
 }

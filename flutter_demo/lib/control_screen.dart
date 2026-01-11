@@ -154,7 +154,7 @@ class _ControlScreenState extends State<ControlScreen> {
   }
 
   String _formatInterval(double interval) {
-    return '${interval.toInt()} Seconds';
+    return '${interval.toInt()} ';
   }
 
   // Gets the current discrete slider step value (1, 2, or 3) from the stored seconds
@@ -352,9 +352,9 @@ class _ControlScreenState extends State<ControlScreen> {
           // unit: '',
           //displayValueOverride: currentPrimaryLabel,
           value: _primaryLogInterval,
-          min: 5,
-          max: 20,
-          divisions: 15,
+          min: 30,
+          max: 300,
+          divisions: 9,
           unit: 's',
           displayValueOverride: _formatInterval(_primaryLogInterval),
           onChanged: (newValue) {
@@ -390,9 +390,9 @@ class _ControlScreenState extends State<ControlScreen> {
           // unit: '',
           // displayValueOverride: currentSamplingLabel,
           value: _samplingLogInterval,
-          min: 5,
-          max: 20,
-          divisions: 15,
+          min: 30,
+          max: 300,
+          divisions: 9,
           unit: 's',
           displayValueOverride: _formatInterval(_samplingLogInterval),
           onChanged: (newValue) {

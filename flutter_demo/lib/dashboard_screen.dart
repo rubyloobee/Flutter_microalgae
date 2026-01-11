@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'data_service.dart';
 import 'control_settings.dart';
 import 'notification_service.dart';
+import 'firestore_service.dart';
 
 // Scaffold (Screen Structure)
 // └── appBar (Title Bar)
@@ -111,14 +112,19 @@ class MonitoringDashboard extends StatefulWidget {
 class _MonitoringDashboardState extends State<MonitoringDashboard> {
   final ControlSettingsManager _settingsManager = ControlSettingsManager();
 
+  final FirestoreService _firestoreService = FirestoreService();
+
   // Reference to the specific camera document
   late DocumentReference _cameraDoc;
+
+  late Stream<QuerySnapshot> _activityStream;
 
   @override
   void initState() {
     super.initState();
     _initializeCameraRef();
     _syncNotificationToken();
+    _activityStream = _firestoreService.getSystemActivity(widget.systemId);
   }
 
   // If user switches between "System 1" and "System 2"
@@ -128,6 +134,10 @@ class _MonitoringDashboardState extends State<MonitoringDashboard> {
     if (widget.systemId != oldWidget.systemId) {
       _initializeCameraRef();
       _syncNotificationToken();
+      // Re-initialize if the system ID changes
+      setState(() {
+        _activityStream = _firestoreService.getSystemActivity(widget.systemId);
+      });
     }
   }
 
@@ -400,6 +410,42 @@ class _MonitoringDashboardState extends State<MonitoringDashboard> {
     );
   }
 
+  // understand code below
+  Widget _buildActivityLogItem(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final String type = data['type'] ?? 'Unknown';
+    final String trigger = data['trigger'] ?? 'auto';
+    final Map<String, dynamic>? values =
+        data['value_at_event'] as Map<String, dynamic>?;
+
+    // Use the document ID as the display time since the field is missing
+    final String displayTime = doc.id;
+
+    return Card(
+      key: ValueKey(doc.id),
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: ListTile(
+        leading: Icon(
+          type == 'Harvest' ? Icons.eco : Icons.opacity,
+          color: Colors.teal,
+        ),
+        title: Text('$type ($trigger)',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (values != null)
+              Text(
+                  'EC: ${values['ec']} | RGB: ${values['rgb']} | Turb: ${values['turbidity']}'),
+            Text(displayTime,
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     //return Scaffold(
@@ -554,6 +600,42 @@ class _MonitoringDashboardState extends State<MonitoringDashboard> {
 
                 _buildCameraSection(),
                 const SizedBox(height: 32),
+
+                // understand code below
+                Text(
+                  'System Activity History',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.teal.shade700),
+                ),
+                const Divider(),
+
+                StreamBuilder<QuerySnapshot>(
+                  stream: _activityStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError)
+                      return Text("Error: ${snapshot.error}");
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final logs = snapshot.data?.docs ?? [];
+
+                    if (logs.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Text("No activity logs found for this system."),
+                      );
+                    }
+
+                    return Column(
+                      children: logs
+                          .map((doc) => _buildActivityLogItem(doc))
+                          .toList(),
+                    );
+                  },
+                ),
               ],
             ),
           );
